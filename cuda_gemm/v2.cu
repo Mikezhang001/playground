@@ -34,7 +34,7 @@ float compare(float *hostC, float *serialC, int M, int N)
     return error;
 }
 
-template <int split_K, int blockDim_y, int blockDim_x, int TM, int TN>// blockDim_y = blockDim_y / TM, blockDim_x = blockDim_x / TN (相较shared memory情况下)
+template <int split_K, int blockDim_y, int blockDim_x, int TM, int TN>// blockDim_y = real_blockDim_y * TM, blockDim_x = real_blockDim_x * TN (相较shared memory情况下)
 __global__ void matrixKernel(float *dA, float *dB, float *dC, int M, int K, int N)
 {
     int row, col;
@@ -104,25 +104,38 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     cudaMemcpy(dA, hostA, M * K * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(dB, hostB, N * K * sizeof(float), cudaMemcpyHostToDevice);
 
-
+    // 假设 TM = TN, BLCOK_DIM_Y = BLOCK_DIM_X，LOGIC_BLOCK_DIM_Y * SPLIT_K = BLOCK_DIM_Y * BLOCK_DIM_X ------> SPLIT_K = ((BLOCK_DIM_X) / TM)；
     #define TM 2
     #define TN 2
 
-
-    int BLOCK_DIM_y = 32 / TM;
-    int BLOCK_DIM_x = 32 / TN;
+    #define BLOCK_DIM_Y 16
+    #define BLOCK_DIM_X 16
+    #define SPLIT_K  32
     
-
+    #define LOGIC_BLOCK_DIM_Y  (TM * BLOCK_DIM_Y)
+    #define LOGIC_BLOCK_DIM_X  (TN * BLOCK_DIM_X)
     
-    int num_blocks_y = (M + BLOCK_DIM_y * TM - 1) / (BLOCK_DIM_y * TM);
-    int num_blocks_x = (N + BLOCK_DIM_x * TN - 1) / (BLOCK_DIM_x * TN);
+    int num_blocks_y = (M + LOGIC_BLOCK_DIM_Y - 1) / LOGIC_BLOCK_DIM_Y;
+    int num_blocks_x = (N + LOGIC_BLOCK_DIM_X - 1) / LOGIC_BLOCK_DIM_X;
+
+    printf("M-K-N: %d-%d-%d\n", M, K, N);
+    printf("TM = %d\n", TM);
+    printf("TN = %d\n", TN);
+    printf("BLOCK_DIM_Y = %d\n", BLOCK_DIM_Y);
+    printf("BLOCK_DIM_X = %d\n", BLOCK_DIM_X);
+    printf("SPLIT_K = %d\n", SPLIT_K);
+    printf("LOGIC_BLOCK_DIM_Y = %d\n", LOGIC_BLOCK_DIM_Y);
+    printf("LOGIC_BLOCK_DIM_X = %d\n", LOGIC_BLOCK_DIM_X);
+    printf("num_blocks_y = %d\n", num_blocks_y);
+    printf("num_blocks_x = %d\n", num_blocks_x);
 
 
-    dim3 block_dim(BLOCK_DIM_x, BLOCK_DIM_y, 1);
+    dim3 block_dim(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
     dim3 grid_dim(num_blocks_x, num_blocks_y, 1);
     int repeat = 20;
     
-    matrixKernel<32, 32, 32, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+    matrixKernel<SPLIT_K, LOGIC_BLOCK_DIM_X, LOGIC_BLOCK_DIM_X, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+    
     cudaEvent_t start, stop;
     float ker_time = 0;
     cudaEventCreate(&start);
@@ -130,7 +143,8 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     cudaEventRecord(start, 0);
     for (int i = 0; i < repeat; i++)
     {
-        matrixKernel<32, 32, 32, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+        matrixKernel<SPLIT_K, LOGIC_BLOCK_DIM_X, LOGIC_BLOCK_DIM_X, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+       
     }
 
     cudaEventRecord(stop, 0);
@@ -145,7 +159,7 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
     ela = get_walltime() - st;
-    printf("M-K-N: %d-%d-%d\n", M, K, N);
+    
     printf("GPU use time: %.4f second\n", ela);
     printf("kernel time: %.4f second, %.4f ms\n", ker_time / (repeat * 1000.), ker_time / repeat);
     printf("grid dim: %d, %d, %d\n", grid_dim.x, grid_dim.y, grid_dim.z);

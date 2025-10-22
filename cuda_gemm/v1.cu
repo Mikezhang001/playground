@@ -80,15 +80,17 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     cudaMemcpy(dA, hostA, M * K * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(dB, hostB, N * K * sizeof(float), cudaMemcpyHostToDevice);
 
-    int BLOCK_DIM_x = 32;
-    int BLOCK_DIM_y = 32;
-    int num_blocks_x = (M + BLOCK_DIM_x - 1) / BLOCK_DIM_x;
-    int num_blocks_y = (N + BLOCK_DIM_y - 1) / BLOCK_DIM_y;
-    dim3 block_dim(BLOCK_DIM_x, BLOCK_DIM_y, 1);
+    #define BLOCK_DIM_Y 32
+    #define BLOCK_DIM_X 32
+    #define SPLIT_K 32
+
+    int num_blocks_x = (M + BLOCK_DIM_X - 1) / BLOCK_DIM_X;
+    int num_blocks_y = (N + BLOCK_DIM_Y - 1) / BLOCK_DIM_Y;
+    dim3 block_dim(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
     dim3 grid_dim(num_blocks_x, num_blocks_y, 1);
     int repeat = 20;
     
-    matrixKernel<64, 32, 32><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+    matrixKernel<SPLIT_K, BLOCK_DIM_Y, BLOCK_DIM_X><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
     cudaEvent_t start, stop;
     float ker_time = 0;
     cudaEventCreate(&start);
@@ -97,7 +99,7 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     for (int i = 0; i < repeat; i++)
     {
         
-        matrixKernel<32, 32, 32><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+        matrixKernel<SPLIT_K, BLOCK_DIM_Y, BLOCK_DIM_X><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
     }
 
     cudaEventRecord(stop, 0);
@@ -122,9 +124,9 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
 int main()
 {
     float *hostA, *hostB, *hostC, *serialC;
-    int M = 4096;
-    int K = 4096;
-    int N = 4096;
+    int M = 1024;
+    int K = 1024;
+    int N = 1024;
 
     hostA = (float *)malloc(M * K * sizeof(float));
     hostB = (float *)malloc(N * K * sizeof(float));
@@ -139,13 +141,13 @@ int main()
         hostB[i] = i % 3;
     }
     hostMatrix(hostA, hostB, hostC, M, K, N);
-    // double st, ela;
-    // st = get_walltime();
-    // matrixSerial(hostA, hostB, serialC, M, K, N);
-    // ela = get_walltime() - st;
-    // float error = compare(hostC, serialC, M, N);
-    // printf("CPU time:%.2f second\n", ela);
-    // printf("The error between CPU and GPU: %.4e\n", error);
+    double st, ela;
+    st = get_walltime();
+    matrixSerial(hostA, hostB, serialC, M, K, N);
+    ela = get_walltime() - st;
+    float error = compare(hostC, serialC, M, N);
+    printf("CPU time:%.2f second\n", ela);
+    printf("The error between CPU and GPU: %.4e\n", error);
     free(hostA);
     free(hostB);
     free(hostC);
