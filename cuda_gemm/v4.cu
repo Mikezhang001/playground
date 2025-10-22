@@ -132,7 +132,7 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     dim3 grid_dim(num_blocks_x, num_blocks_y, 1);
     int repeat = 20;
     
-    matrixKernel<SPLIT_K, LOGIC_BLOCK_DIM_X, LOGIC_BLOCK_DIM_X, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+    matrixKernel<SPLIT_K, LOGIC_BLOCK_DIM_Y, LOGIC_BLOCK_DIM_X, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
     
     cudaEvent_t start, stop;
     float ker_time = 0;
@@ -141,7 +141,7 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     cudaEventRecord(start, 0);
     for (int i = 0; i < repeat; i++)
     {
-        matrixKernel<SPLIT_K, LOGIC_BLOCK_DIM_X, LOGIC_BLOCK_DIM_X, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
+        matrixKernel<SPLIT_K, LOGIC_BLOCK_DIM_Y, LOGIC_BLOCK_DIM_X, TM, TN><<<grid_dim, block_dim>>>(dA, dB, dC, M, K, N);
        
     }
 
