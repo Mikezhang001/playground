@@ -103,11 +103,11 @@ void hostMatrix(float *hostA, float *hostB, float *hostC, int M, int K, int N)
     cudaMemcpy(dB, hostB, N * K * sizeof(float), cudaMemcpyHostToDevice);
 
     // 假设 TM = TN, BLCOK_DIM_Y = BLOCK_DIM_X，LOGIC_BLOCK_DIM_Y * SPLIT_K = BLOCK_DIM_Y * BLOCK_DIM_X * 4 ------> SPLIT_K = ((4 * BLOCK_DIM_X) / TM)；
-    #define TM 4
-    #define TN 4
+    #define TM 8
+    #define TN 8
 
-    #define BLOCK_DIM_Y 32
-    #define BLOCK_DIM_X 32
+    #define BLOCK_DIM_Y 16
+    #define BLOCK_DIM_X 16
     #define SPLIT_K  ((4 * BLOCK_DIM_X) / TM)
     
     #define LOGIC_BLOCK_DIM_Y  (TM * BLOCK_DIM_Y)
