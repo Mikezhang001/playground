@@ -38,7 +38,7 @@ __global__ void matrixKernel1st(float *dA, float *dB, float *dC, int M, int K, i
     int row, col;
     row = threadIdx.y + blockIdx.y * blockDim.y;
     col = threadIdx.x + blockIdx.x * blockDim.x;
-
+    dC[row * N + col] = 0.0f;
     for(int i = 0; i < K; i++)
     {
         dC[row * N + col] += dA[row * K + i] * dB[i * N+ col];
