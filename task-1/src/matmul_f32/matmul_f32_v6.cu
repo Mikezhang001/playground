@@ -59,11 +59,11 @@ PLAYGROUND_MATMUL_DEC(float32_t, 6, M, N, K, A, B, C)
 {
 
     // 假设 TM = TN, BLCOK_DIM_Y = BLOCK_DIM_X，LOGIC_BLOCK_DIM_Y * SPLIT_K = BLOCK_DIM_Y * BLOCK_DIM_X ------> SPLIT_K = ((BLOCK_DIM_X) / TM)；
-    #define TM 4
-    #define TN 4
+    #define TM 2
+    #define TN 2
 
-    #define BLOCK_DIM_Y 32
-    #define BLOCK_DIM_X 32
+    #define BLOCK_DIM_Y 16
+    #define BLOCK_DIM_X 16
     #define SPLIT_K  ((BLOCK_DIM_X) / TM)
     
     #define LOGIC_BLOCK_DIM_Y  (TM * BLOCK_DIM_Y)
