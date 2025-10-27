@@ -4,19 +4,20 @@
 
 namespace playground
 {
-__global__ void matrixKernel2st(float *dA, float *dB, float *dC, int M, int K, int N)
+__global__ void matrixKernel3st(float *dA, float *dB, float *dC, int M, int K, int N)
 {
     int row, col;
     row = threadIdx.y + blockIdx.y * blockDim.y;
     col = threadIdx.x + blockIdx.x * blockDim.x;
-    dC[row * N + col] = 0.0f;
+    float sum = 0.0f;
     for(int i = 0; i < K; i++)
     {
-        dC[row * N + col] += dA[row * K + i] * dB[i * N+ col];
+        sum += dA[row * K + i] * dB[i * N+ col];
     }
+    dC[row * N + col] = sum;
 }
 
-PLAYGROUND_MATMUL_DEC(float32_t, 2, M, N, K, A, B, C)
+PLAYGROUND_MATMUL_DEC(float32_t, 3, M, N, K, A, B, C)
 {
 
     #define TM 1
@@ -34,7 +35,7 @@ PLAYGROUND_MATMUL_DEC(float32_t, 2, M, N, K, A, B, C)
     dim3 block_dim(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
     dim3 grid_dim(num_blocks_x, num_blocks_y, 1);
 
-    matrixKernel2st<<<grid_dim, block_dim>>>(const_cast<float*>(A), const_cast<float*>(B), const_cast<float*>(C), M, K, N);
+    matrixKernel3st<<<grid_dim, block_dim>>>(const_cast<float*>(A), const_cast<float*>(B), const_cast<float*>(C), M, K, N);
     cudaDeviceSynchronize();
 }
 }  // namespace playground
