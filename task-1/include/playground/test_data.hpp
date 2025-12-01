@@ -172,8 +172,12 @@ public:
         } else {
             throw std::runtime_error("Unsupported data type");
         }
-    }
+        for (auto& v : _GT) {//avoid calculateAvgErr __GT[i] = 0;           
+            if (v == static_cast<params::DataType>(0)) 
+                v = static_cast<params::DataType>(1e-6);
 
+        }
+     }
     void initDeviceData()
     {
         _d_A = CudaDeviceMemPtr<params::DataType>(_A.size());
