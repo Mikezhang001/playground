@@ -174,18 +174,37 @@ A `.ncu-rep` file will be generated in the `logs/profiles/` directory with times
 ## 5. Example Target Results
 
 ### CUDA Core(FP32)
-| Version | v0 | v1 | v2 | v3 | v4 | cuBLAS | Theory Peak |
-| --- | --- | --- | --- | --- | --- | --- | --- | 
-| Average error | 0.0115 | 0.0115 | 0.0115 | 0.0116 | 0.0116 | / | / |
-| TFLOPS | 2.41 | 3.85 | 9.24 | 15.15 | 17.16 | 18.38 | 19.5 |
+| Version | v2 | v3 | v4 | v5 | v6 | v7 | v8 | v9 | v10 | v11 |cuBLAS | Theory Peak |
+| --- | --- | --- | --- | --- | --- | --- | --- |--- | --- | --- | --- | --- |  
+| Average error(e-06) | 5.8  | 7.04|  8.83|  6.83|  6.78| 9.63 | 6.82 |   6.40| 7.79|  6.82| 5.94 | / |
+| TFLOPS              | 0.89 | 3.04 | 3.66 |5.17 | 7.3 | 10.54 |  11.84|11.64 | 15.41 |  17.10|  18.71 |  19.5|
 
-### Tensor Core(FP16)
+####  V2 这个版本非常的显而意见，与cpu做乘法的逻辑基本是一致的，记得dC = 0初始化.
+####  V3 用寄存器变量来取代每次的dC[row * N + col]
+####  V4 首次引入shared memory，变化split_K的维度，但感觉似乎影响并不是太大
+####  V5 如果每个thread只处理自己对应位置，会发现A矩阵重复的行和B矩阵的列切有关，B也是同理，所以引入TM和TN来减少这部分的数据重复。TM = TN =4，反而慢于TM = TN =2.
+####  V6 在V5的情况下, 使shared memory中元素的个数与block中实际thread数目一致，并对线程重排序，从而去除了对K切片后的TM和TN的再次循环。这个参数会更快，所以改成这个，且可以于V7形成一个比较
+####  V7 在V6的情况下, 使用(float4 &)来加速dA -> S_A, dB -> S_B.  参数可以于V6对照
+####  V8 对矩阵S_A进行转置，用来避免bank冲突的，运算中S_A的遍历也需要进行改变
+####  V9 内积换外积（改变遍历顺序）
+####  V10 内积换外积（改变遍历顺序）+ (float4 &加速S_A ->寄存器变量，float4 &加速S_B->寄存器变量)
+####  V11 在V10的基础上进行一个双流水的设定，关键在于将循环id = 0的数据搬运单独拿出,循环体内进行如下循环（i - 1次前的计算，i次的数据搬运），结束前再计算一次最后的遗留
 
-| Version | v0 | v1 | v2 |  v3 |v4 | cuBLAS | Theory Peak |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Average error | 0.0117 | 0.0117 | 0.0117 | 0.0117 | 0.0019 |0.0153 | / |
-| TFLOPS | 18.09 | 53.05 |103.05 |159.35 | 213.12 |222.11 | 312 |
+### Tensor Core(MMA)(FP16)
 
+| Version | v0 | v1_0 | v1-3-5-sw |  v2-sw |v3-sw | v3-1sw | v4-sw| v4-1-sw|cuBLAS| Theory Peak|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |--- |
+| Average error | 0.0188 | 0.0187 | 0.0192 |0.0178 | 0.0182 | 0.0187| 0.0167| 0.0224 | 0.0264|/ |
+| TFLOPS        | 9.66 | 46.81 |142.31 |138.98 | 130.84 | 164.91 | 124.08| 206.11 | 219.53|312 |
+
+####  v0  每个block处理[16, 8]
+####  v1_0 Shared memory版本
+####  v1-3-5-sw 仿照样例(mma_naive.cu)改改访问方式，本质还是1-3-4-sw，随便一动优化就没了离谱(一维布局调用）
+####  v2-sw  float4换async指令（没有明显速度上升，但(16,16)调用速度不会下降特别多)
+####  v3-sw  double buffer预取S_A, S_B
+####  v3-1sw  RA, RB开double buffer
+####  v4-sw  2阶段流水线，将shared memory的流水线拿出去
+####  v4-1-sw 在4-sw的基础上进行三阶段流水
 > 💡**Note**:  
 > Some card can reach above 250 TFLOPS using cuBLAS fp16. The target is the 90% of cuBLAS on the same card
 
